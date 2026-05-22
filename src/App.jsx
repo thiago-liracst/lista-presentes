@@ -4,6 +4,7 @@ import {
   deleteGift, saveQrCode, getQrCode
 } from "./firebase";
 
+import logo from "./assets/logo.png";
 
 const ADMIN_PASSWORD = "casamento2025"; // Change this!
 
@@ -167,11 +168,15 @@ const styles = `
     .header-brand { display: flex; align-items: center; gap: 1rem; }
     .header-logo {
       width: 44px; height: 44px;
-      background: var(--gold);
+      background: #fff;
       border-radius: 50%;
       display: flex; align-items: center; justify-content: center;
       color: white; font-size: 1.1rem;
     }
+    .header-logo { display: flex; align-items: center; }
+    .header-logo img { height: 60px; width: auto; }
+    .body-logo { display: flex; justify-content: center; margin-bottom: 1rem; }
+    .body-logo img { height: 200px; width: auto; }
     .header-title { font-family: 'Cormorant Garamond', serif; font-size: 1.5rem; font-weight: 400; color: var(--dark); }
     .header-subtitle { font-size: 0.75rem; color: var(--light); letter-spacing: 0.12em; text-transform: uppercase; }
     .nav-tabs { display: flex; gap: 0.5rem; }
@@ -483,7 +488,7 @@ const styles = `
       .stats-grid { grid-template-columns: 1fr 1fr; }
     }
   `;
-
+  
   return (
     <>
       <style>{styles}</style>
@@ -491,7 +496,9 @@ const styles = `
       {/* Header */}
       <header className="header">
         <div className="header-brand">
-          <div className="header-logo">♡</div>
+          <div className="header-logo">
+            <img src={logo} alt="Logo" />
+          </div>
           <div>
             <div className="header-title font-display">Lista de Presentes</div>
             <div className="header-subtitle">Cecília & Thiago · 30 Jan 2027</div>
@@ -522,6 +529,9 @@ const styles = `
       {view === "gallery" && (
         <>
           <div className="hero">
+            <div className="body-logo">
+              <img src={logo} alt="Logo" />
+            </div>
             <div className="hero-ornament">✦ ✦ ✦</div>
             <h1 className="hero-title font-display">Nossa Lista de<br />Presentes</h1>
             <div className="hero-divider" />
