@@ -531,7 +531,7 @@ export default function WeddingRegistry() {
           <div className="header-logo">♡</div>
           <div>
             <div className="header-title font-display">Lista de Presentes</div>
-            <div className="header-subtitle">Cecília & Thiago · 30 de Janeiro de 2027</div>
+            <div className="header-subtitle">Cecília & Thiago · 30 Jan 2027</div>
           </div>
         </div>
         <nav className="nav-tabs">
