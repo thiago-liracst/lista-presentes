@@ -1,397 +1,19 @@
 import { useState, useEffect, useCallback } from "react";
+import {
+  db, subscribeGifts, addGift, updateGift,
+  deleteGift, saveQrCode, getQrCode
+} from "./firebase";
 
-const FIREBASE_CONFIG_PLACEHOLDER = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-};
-
-// ─── Inline Firebase SDK via CDN ─────────────────────────────────────────────
-// This component dynamically loads Firebase from CDN
-// Replace FIREBASE_CONFIG_PLACEHOLDER with your actual config
 
 const ADMIN_PASSWORD = "casamento2025"; // Change this!
-
-// ─── Styles ──────────────────────────────────────────────────────────────────
-const styles = `
-  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Jost:wght@300;400;500&display=swap');
-
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-
-  :root {
-    --cream: #F4F5EE;
-    --gold: #6B7A3A;
-    --gold-light: #8C9E50;
-    --gold-pale: #E8EDD6;
-    --dark: #1E2410;
-    --mid: #4A5528;
-    --light: #7D8C58;
-    --white: #FFFFFF;
-    --rose: #8A9E6A;
-    --sage: #5C7A3E;
-    --border: rgba(107,122,58,0.25);
-    --shadow: 0 2px 24px rgba(30,36,16,0.08);
-  }
-
-  body { background: var(--cream); font-family: 'Jost', sans-serif; color: var(--dark); }
-
-  .font-display { font-family: 'Cormorant Garamond', serif; }
-
-  /* Header */
-  .header {
-    background: var(--white);
-    border-bottom: 1px solid var(--border);
-    padding: 1.5rem 2rem;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    position: sticky;
-    top: 0;
-    z-index: 100;
-    backdrop-filter: blur(8px);
-  }
-  .header-brand { display: flex; align-items: center; gap: 1rem; }
-  .header-logo {
-    width: 44px; height: 44px;
-    background: var(--gold);
-    border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    color: white; font-size: 1.1rem;
-  }
-  .header-title { font-family: 'Cormorant Garamond', serif; font-size: 1.5rem; font-weight: 400; color: var(--dark); }
-  .header-subtitle { font-size: 0.75rem; color: var(--light); letter-spacing: 0.12em; text-transform: uppercase; }
-  .nav-tabs { display: flex; gap: 0.5rem; }
-  .nav-tab {
-    padding: 0.5rem 1.25rem;
-    border: 1px solid transparent;
-    border-radius: 100px;
-    font-family: 'Jost', sans-serif;
-    font-size: 0.82rem;
-    font-weight: 400;
-    letter-spacing: 0.06em;
-    cursor: pointer;
-    transition: all 0.2s;
-    background: transparent;
-    color: var(--mid);
-  }
-  .nav-tab:hover { border-color: var(--border); background: var(--gold-pale); }
-  .nav-tab.active { background: var(--dark); color: var(--white); border-color: var(--dark); }
-  .nav-tab.admin { color: var(--gold); border-color: var(--border); }
-  .nav-tab.admin.active { background: var(--gold); color: var(--white); border-color: var(--gold); }
-
-  /* Hero */
-  .hero {
-    text-align: center;
-    padding: 5rem 2rem 3rem;
-    background: linear-gradient(180deg, var(--white) 0%, var(--cream) 100%);
-    border-bottom: 1px solid var(--border);
-    position: relative;
-    overflow: hidden;
-  }
-  .hero::before {
-    content: '';
-    position: absolute; inset: 0;
-    background-image: radial-gradient(circle at 20% 50%, rgba(184,150,62,0.06) 0%, transparent 60%),
-                      radial-gradient(circle at 80% 20%, rgba(196,132,122,0.06) 0%, transparent 60%);
-  }
-  .hero-ornament { color: var(--gold); font-size: 1.5rem; letter-spacing: 0.5em; margin-bottom: 1rem; opacity: 0.7; }
-  .hero-title { font-family: 'Cormorant Garamond', serif; font-size: clamp(2.5rem, 5vw, 4rem); font-weight: 300; color: var(--dark); line-height: 1.1; }
-  .hero-subtitle { font-size: 0.85rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--light); margin: 1rem 0; }
-  .hero-desc { max-width: 540px; margin: 0 auto; color: var(--mid); font-size: 0.95rem; line-height: 1.7; font-weight: 300; }
-  .hero-divider { width: 60px; height: 1px; background: var(--gold); margin: 1.5rem auto; }
-
-  /* Grid */
-  .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1.5rem; }
-
-  /* Gift Card */
-  .gift-card {
-    background: var(--white);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    overflow: hidden;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    position: relative;
-  }
-  .gift-card:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
-  .gift-card.reserved { opacity: 0.75; }
-
-  .gift-img {
-    width: 100%; height: 200px;
-    background: var(--gold-pale);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 3rem; color: var(--gold-light);
-    position: relative; overflow: hidden;
-  }
-  .gift-img img { width: 100%; height: 100%; object-fit: cover; }
-  .gift-img-placeholder { font-size: 2.5rem; opacity: 0.5; }
-
-  .reserved-badge {
-    position: absolute; top: 12px; right: 12px;
-    background: var(--dark); color: var(--white);
-    font-size: 0.7rem; font-weight: 500; letter-spacing: 0.1em;
-    text-transform: uppercase; padding: 4px 12px; border-radius: 100px;
-  }
-  .reserved-by {
-    position: absolute; bottom: 12px; left: 12px; right: 12px;
-    background: rgba(44,36,24,0.85);
-    color: var(--white); font-size: 0.75rem;
-    padding: 6px 12px; border-radius: 8px;
-    backdrop-filter: blur(4px);
-  }
-
-  .gift-body { padding: 1.25rem; }
-  .gift-name { font-family: 'Cormorant Garamond', serif; font-size: 1.25rem; font-weight: 500; color: var(--dark); margin-bottom: 0.4rem; }
-  .gift-desc { font-size: 0.82rem; color: var(--mid); line-height: 1.6; margin-bottom: 1rem; min-height: 52px; }
-  .gift-price { font-family: 'Cormorant Garamond', serif; font-size: 1.5rem; font-weight: 600; color: var(--gold); }
-  .gift-footer { padding: 0 1.25rem 1.25rem; display: flex; gap: 0.5rem; }
-
-  /* Buttons */
-  .btn {
-    padding: 0.6rem 1.25rem;
-    border-radius: 100px;
-    font-family: 'Jost', sans-serif;
-    font-size: 0.82rem;
-    font-weight: 500;
-    letter-spacing: 0.06em;
-    cursor: pointer;
-    transition: all 0.2s;
-    border: 1px solid transparent;
-    flex: 1;
-    text-align: center;
-  }
-  .btn-primary { background: var(--dark); color: var(--white); }
-  .btn-primary:hover { background: var(--mid); }
-  .btn-outline { background: transparent; border-color: var(--border); color: var(--mid); }
-  .btn-outline:hover { background: var(--gold-pale); border-color: var(--gold); color: var(--dark); }
-  .btn-gold { background: var(--gold); color: var(--white); }
-  .btn-gold:hover { background: var(--gold-light); }
-  .btn-danger { background: #e05252; color: white; }
-  .btn-danger:hover { background: #c43d3d; }
-  .btn-sm { padding: 0.4rem 0.9rem; font-size: 0.75rem; }
-  .btn:disabled { opacity: 0.45; cursor: not-allowed; }
-
-  /* Modal */
-  .modal-overlay {
-    position: fixed; inset: 0;
-    background: rgba(44,36,24,0.6);
-    z-index: 1000;
-    display: flex; align-items: center; justify-content: center;
-    padding: 1rem;
-    backdrop-filter: blur(4px);
-  }
-  .modal {
-    background: var(--white);
-    border-radius: 20px;
-    padding: 2rem;
-    width: 100%;
-    max-width: 480px;
-    max-height: 90vh;
-    overflow-y: auto;
-    position: relative;
-  }
-  .modal-title { font-family: 'Cormorant Garamond', serif; font-size: 1.6rem; font-weight: 400; margin-bottom: 0.25rem; }
-  .modal-subtitle { font-size: 0.82rem; color: var(--light); margin-bottom: 1.5rem; }
-  .modal-close {
-    position: absolute; top: 1rem; right: 1rem;
-    background: var(--cream); border: none; border-radius: 50%;
-    width: 32px; height: 32px;
-    cursor: pointer; font-size: 1rem; color: var(--mid);
-    display: flex; align-items: center; justify-content: center;
-  }
-
-  /* Form */
-  .form-group { margin-bottom: 1.1rem; }
-  .form-label { font-size: 0.78rem; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--mid); margin-bottom: 0.4rem; display: block; }
-  .form-input {
-    width: 100%;
-    padding: 0.65rem 1rem;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    font-family: 'Jost', sans-serif;
-    font-size: 0.9rem;
-    color: var(--dark);
-    background: var(--white);
-    transition: border-color 0.2s;
-    outline: none;
-  }
-  .form-input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(184,150,62,0.1); }
-  .form-input::placeholder { color: var(--light); }
-  textarea.form-input { resize: vertical; min-height: 80px; }
-
-  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-
-  /* QR Code section */
-  .qr-preview {
-    border: 2px dashed var(--border);
-    border-radius: 12px;
-    padding: 2rem;
-    text-align: center;
-    margin: 1rem 0;
-    background: var(--gold-pale);
-  }
-  .qr-img { max-width: 160px; max-height: 160px; border-radius: 8px; }
-  .qr-placeholder { color: var(--light); font-size: 0.85rem; }
-
-  /* Admin Dashboard */
-  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
-  .stat-card {
-    background: var(--white);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 1.25rem;
-    text-align: center;
-  }
-  .stat-value { font-family: 'Cormorant Garamond', serif; font-size: 2rem; font-weight: 600; color: var(--gold); }
-  .stat-label { font-size: 0.75rem; color: var(--light); letter-spacing: 0.1em; text-transform: uppercase; margin-top: 0.25rem; }
-
-  .admin-table { width: 100%; border-collapse: collapse; }
-  .admin-table th {
-    text-align: left;
-    font-size: 0.75rem;
-    font-weight: 500;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--light);
-    padding: 0.75rem 1rem;
-    border-bottom: 1px solid var(--border);
-  }
-  .admin-table td { padding: 0.9rem 1rem; border-bottom: 1px solid rgba(184,150,62,0.1); font-size: 0.88rem; vertical-align: middle; }
-  .admin-table tr:last-child td { border-bottom: none; }
-  .admin-table tr:hover td { background: var(--gold-pale); }
-
-  .status-pill {
-    display: inline-block;
-    padding: 3px 10px;
-    border-radius: 100px;
-    font-size: 0.72rem;
-    font-weight: 500;
-    letter-spacing: 0.06em;
-  }
-  .status-available { background: #eaf5e9; color: #3a7a35; }
-  .status-reserved { background: #fff3e0; color: #c47a00; }
-  .status-confirmed { background: #fde8e8; color: #c43d3d; }
-
-  /* Section heading */
-  .section-header { text-align: center; padding: 3rem 2rem 1.5rem; }
-  .section-title { font-family: 'Cormorant Garamond', serif; font-size: 2rem; font-weight: 400; }
-  .section-divider { width: 48px; height: 1px; background: var(--gold); margin: 0.75rem auto; }
-  .section-sub { color: var(--mid); font-size: 0.88rem; }
-
-  /* Filter bar */
-  .filter-bar {
-    display: flex; gap: 0.5rem; flex-wrap: wrap;
-    padding: 0 2rem 1.5rem;
-    max-width: 1200px; margin: 0 auto;
-  }
-  .filter-chip {
-    padding: 0.4rem 1rem;
-    border-radius: 100px;
-    border: 1px solid var(--border);
-    font-size: 0.8rem;
-    color: var(--mid);
-    background: var(--white);
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-  .filter-chip.active { background: var(--dark); color: var(--white); border-color: var(--dark); }
-
-  /* Payment step */
-  .payment-options { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin: 1rem 0; }
-  .payment-option {
-    border: 1.5px solid var(--border);
-    border-radius: 12px;
-    padding: 1rem;
-    cursor: pointer;
-    text-align: center;
-    transition: all 0.2s;
-    background: var(--white);
-  }
-  .payment-option:hover { border-color: var(--gold); background: var(--gold-pale); }
-  .payment-option.selected { border-color: var(--gold); background: var(--gold-pale); }
-  .payment-option-icon { font-size: 1.5rem; margin-bottom: 0.4rem; }
-  .payment-option-title { font-size: 0.82rem; font-weight: 500; color: var(--dark); }
-  .payment-option-desc { font-size: 0.72rem; color: var(--light); margin-top: 2px; }
-
-  /* Steps */
-  .steps { display: flex; gap: 0; margin-bottom: 1.5rem; }
-  .step-item {
-    flex: 1; text-align: center; padding: 0.5rem;
-    font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase;
-    color: var(--light); border-bottom: 2px solid var(--border); padding-bottom: 0.75rem;
-  }
-  .step-item.active { color: var(--gold); border-color: var(--gold); font-weight: 500; }
-  .step-item.done { color: var(--sage); border-color: var(--sage); }
-
-  /* Toast */
-  .toast {
-    position: fixed; bottom: 2rem; right: 2rem;
-    background: var(--dark); color: var(--white);
-    padding: 0.9rem 1.5rem;
-    border-radius: 12px;
-    font-size: 0.88rem;
-    z-index: 9999;
-    animation: slideIn 0.3s ease;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.25);
-  }
-  .toast.success { background: #2e6b2a; }
-  .toast.error { background: #8b2020; }
-
-  @keyframes slideIn {
-    from { transform: translateY(20px); opacity: 0; }
-    to { transform: translateY(0); opacity: 1; }
-  }
-
-  /* Empty state */
-  .empty-state { text-align: center; padding: 5rem 2rem; color: var(--light); }
-  .empty-state-icon { font-size: 3rem; margin-bottom: 1rem; opacity: 0.4; }
-  .empty-state-text { font-family: 'Cormorant Garamond', serif; font-size: 1.4rem; color: var(--mid); }
-
-  /* Loader */
-  .loader { text-align: center; padding: 4rem; color: var(--light); }
-
-  /* Config notice */
-  .config-notice {
-    background: #fff8e1; border: 1px solid #f0c040; border-radius: 12px;
-    padding: 1.25rem 1.5rem; margin: 1rem 2rem;
-    font-size: 0.85rem; color: #7a5f00;
-  }
-  .config-notice code {
-    background: rgba(0,0,0,0.08); border-radius: 4px;
-    padding: 2px 6px; font-family: monospace; font-size: 0.8rem;
-  }
-
-  @media (max-width: 640px) {
-    .header { padding: 1rem; }
-    .nav-tabs { display: none; }
-    .form-row { grid-template-columns: 1fr; }
-    .payment-options { grid-template-columns: 1fr; }
-    .stats-grid { grid-template-columns: 1fr 1fr; }
-  }
-`;
-
-// ─── Mock data for demo ───────────────────────────────────────────────────────
-const MOCK_GIFTS = [
-  { id: "1", name: "Jogo de Panelas Tramontina", description: "Conjunto 5 peças antiaderente, perfeito para equipar a nova cozinha com qualidade e durabilidade.", price: 389.90, link: "https://tramontina.com.br", emoji: "🍳", status: "available", reservedBy: null },
-  { id: "2", name: "Liquidificador Mondial", description: "Potência de 900W com 10 velocidades e copo de vidro de 2 litros.", price: 189.90, link: "https://mondial.com.br", emoji: "🫙", status: "reserved", reservedBy: { name: "Carlos Mendes", method: "presencial" } },
-  { id: "3", name: "Aspirador de Pó Dyson", description: "Modelo sem fio com 60 min de autonomia e tecnologia ciclônica de alta eficiência.", price: 2890.00, link: "https://dyson.com.br", emoji: "🌀", status: "available", reservedBy: null },
-  { id: "4", name: "Jogo de Cama Queen Premium", description: "Lençol 500 fios 100% algodão egípcio, inclui 4 fronhas com bordado exclusivo.", price: 599.00, link: "https://amazon.com.br", emoji: "🛏️", status: "confirmed", reservedBy: { name: "Ana Paula Lima", method: "pix" } },
-  { id: "5", name: "Fritadeira Air Fryer 5L", description: "Capacidade familiar com 12 funções pré-programadas e display digital touchscreen.", price: 449.00, link: "https://philips.com.br", emoji: "🥗", status: "available", reservedBy: null },
-  { id: "6", name: "Smart TV 55\" 4K", description: "Tela QLED com HDR10+, sistema operacional com streaming integrado e controle por voz.", price: 3199.00, link: "https://samsung.com.br", emoji: "📺", status: "available", reservedBy: null },
-  { id: "7", name: "Cafeteira Nespresso", description: "Máquina de cápsulas com sistema de espuma de leite aeroccino, 19 bar de pressão.", price: 879.00, link: "https://nespresso.com", emoji: "☕", status: "reserved", reservedBy: { name: "Roberto Silva", method: "presencial" } },
-  { id: "8", name: "Batedeira Stand Mixer KitchenAid", description: "Motor de 300W com 10 velocidades e acessórios de aço inox para todas as receitas.", price: 1599.00, link: "https://kitchenaid.com.br", emoji: "🎂", status: "available", reservedBy: null },
-];
 
 const MOCK_QR = "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d0/QR_code_for_mobile_English_Wikipedia.svg/220px-QR_code_for_mobile_English_Wikipedia.svg.png";
 
 // ─── Main App ─────────────────────────────────────────────────────────────────
 export default function WeddingRegistry() {
   const [view, setView] = useState("gallery"); // gallery | admin | admin-login
-  const [gifts, setGifts] = useState(MOCK_GIFTS);
-  const [qrCode, setQrCode] = useState(MOCK_QR);
+  const [gifts, setGifts] = useState([]);
+  const [qrCode, setQrCode] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
   const [toast, setToast] = useState(null);
@@ -400,60 +22,16 @@ export default function WeddingRegistry() {
   const [showAddGift, setShowAddGift] = useState(false);
   const [showQrConfig, setShowQrConfig] = useState(false);
   const [editingGift, setEditingGift] = useState(null);
-  const [firebaseReady, setFirebaseReady] = useState(false);
-  const [usingMock, setUsingMock] = useState(true);
-
-  // Firebase refs (populated after init)
-  const [db, setDb] = useState(null);
-  const [firebaseApp, setFirebaseApp] = useState(null);
+  // Carrega dados do Firebase em tempo real
+  useEffect(() => {
+    const unsub = subscribeGifts((data) => setGifts(data));
+    getQrCode().then(url => { if (url) setQrCode(url); });
+    return () => unsub();
+  }, []);
 
   const showToast = useCallback((msg, type = "default") => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3500);
-  }, []);
-
-  // ── Firebase init ──────────────────────────────────────────────────────────
-  useEffect(() => {
-    // Try to load Firebase from CDN
-    const loadFirebase = async () => {
-      try {
-        const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js");
-        const { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, onSnapshot, setDoc } =
-          await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js");
-
-        // Check if user has configured Firebase
-        if (FIREBASE_CONFIG_PLACEHOLDER.apiKey === "SUA_API_KEY") {
-          setUsingMock(true);
-          return;
-        }
-
-        const app = initializeApp(FIREBASE_CONFIG_PLACEHOLDER);
-        const firestore = getFirestore(app);
-        setFirebaseApp(app);
-        setDb(firestore);
-        setFirebaseReady(true);
-        setUsingMock(false);
-
-        // Listen to gifts
-        const unsub = onSnapshot(collection(firestore, "gifts"), (snap) => {
-          const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-          setGifts(data);
-        });
-
-        // Listen to settings (QR code)
-        const unsubSettings = onSnapshot(collection(firestore, "settings"), (snap) => {
-          const settings = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-          const qrSetting = settings.find(s => s.id === "qrcode");
-          if (qrSetting?.url) setQrCode(qrSetting.url);
-        });
-
-        return () => { unsub(); unsubSettings(); };
-      } catch (e) {
-        setUsingMock(true);
-      }
-    };
-
-    loadFirebase();
   }, []);
 
   // ── Admin login ────────────────────────────────────────────────────────────
@@ -470,46 +48,73 @@ export default function WeddingRegistry() {
 
   // ── CRUD gifts (mock mode) ─────────────────────────────────────────────────
   const saveGift = async (giftData) => {
-    if (editingGift) {
-      setGifts(g => g.map(item => item.id === editingGift.id ? { ...item, ...giftData } : item));
-    } else {
-      const newGift = { ...giftData, id: Date.now().toString(), status: "available", reservedBy: null };
-      setGifts(g => [...g, newGift]);
+    const isEditing = editingGift;
+    try {
+      if (isEditing) {
+        await updateGift(isEditing.id, giftData);
+      } else {
+        await addGift({ ...giftData, status: "available", reservedBy: null });
+      }
+      setShowAddGift(false);
+      setEditingGift(null);
+      showToast(isEditing ? "Presente atualizado!" : "Presente adicionado!", "success");
+    } catch (e) {
+      showToast("Erro ao salvar. Verifique o Firebase.", "error");
+      console.error(e);
     }
-    setShowAddGift(false);
-    setEditingGift(null);
-    showToast(editingGift ? "Presente atualizado!" : "Presente adicionado!", "success");
   };
 
-  const deleteGift = (id) => {
+  const deleteGiftHandler = async (id) => {
     if (!window.confirm("Remover este presente da lista?")) return;
-    setGifts(g => g.filter(item => item.id !== id));
-    showToast("Presente removido.");
+    try {
+      await deleteGift(id);
+      showToast("Presente removido.");
+    } catch (e) {
+      showToast("Erro ao remover.", "error");
+    }
   };
 
-  const confirmReservation = (giftId, guestName, method) => {
-    setGifts(g => g.map(item =>
-      item.id === giftId
-        ? { ...item, status: method === "pix" ? "confirmed" : "reserved", reservedBy: { name: guestName, method } }
-        : item
-    ));
-    setSelectedGift(null);
-    showToast(`Presente reservado com sucesso! Obrigado, ${guestName.split(" ")[0]}! 💕`, "success");
+  const confirmReservation = async (giftId, guestName, method) => {
+    try {
+      await updateGift(giftId, {
+        status: method === "pix" ? "confirmed" : "reserved",
+        reservedBy: { name: guestName, method }
+      });
+      setSelectedGift(null);
+      showToast(`Reservado com sucesso! Obrigado, ${guestName.split(" ")[0]}! 💕`, "success");
+    } catch (e) {
+      showToast("Erro ao reservar. Tente novamente.", "error");
+      console.error(e);
+    }
   };
 
-  const releaseGift = (id) => {
-    setGifts(g => g.map(item => item.id === id ? { ...item, status: "available", reservedBy: null } : item));
-    showToast("Presente disponibilizado novamente.");
+  const releaseGift = async (id) => {
+    try {
+      await updateGift(id, { status: "available", reservedBy: null });
+      showToast("Presente disponibilizado novamente.");
+    } catch (e) {
+      showToast("Erro ao liberar presente.", "error");
+    }
   };
 
+  const handleSaveQr = async (url) => {
+    try {
+      await saveQrCode(url);
+      setQrCode(url);
+      setShowQrConfig(false);
+      showToast("QR Code atualizado!", "success");
+    } catch (e) {
+      showToast("Erro ao salvar QR Code.", "error");
+    }
+  };
   // ── Computed stats ─────────────────────────────────────────────────────────
   const stats = {
     total: gifts.length,
     available: gifts.filter(g => g.status === "available").length,
     reserved: gifts.filter(g => g.status === "reserved").length,
     confirmed: gifts.filter(g => g.status === "confirmed").length,
-    totalValue: gifts.reduce((s, g) => s + g.price, 0),
-    collectedValue: gifts.filter(g => g.status === "confirmed").reduce((s, g) => s + g.price, 0),
+    totalValue: gifts.reduce((s, g) => s + (Number(g.price) || 0), 0),
+    collectedValue: gifts.filter(g => g.status === "confirmed").reduce((s, g) => s + (Number(g.price) || 0), 0),
   };
 
   const filteredGifts = gifts.filter(g => {
@@ -520,6 +125,364 @@ export default function WeddingRegistry() {
   });
 
   const fmt = (val) => val.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+  // ─── Styles ──────────────────────────────────────────────────────────────────
+const styles = `
+    @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Jost:wght@300;400;500&display=swap');
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --cream: #F4F5EE;
+      --gold: #6B7A3A;
+      --gold-light: #8C9E50;
+      --gold-pale: #E8EDD6;
+      --dark: #1E2410;
+      --mid: #4A5528;
+      --light: #7D8C58;
+      --white: #FFFFFF;
+      --rose: #8A9E6A;
+      --sage: #5C7A3E;
+      --border: rgba(107,122,58,0.25);
+      --shadow: 0 2px 24px rgba(30,36,16,0.08);
+    }
+
+    body { background: var(--cream); font-family: 'Jost', sans-serif; color: var(--dark); }
+
+    .font-display { font-family: 'Cormorant Garamond', serif; }
+
+    /* Header */
+    .header {
+      background: var(--white);
+      border-bottom: 1px solid var(--border);
+      padding: 1.5rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(8px);
+    }
+    .header-brand { display: flex; align-items: center; gap: 1rem; }
+    .header-logo {
+      width: 44px; height: 44px;
+      background: var(--gold);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      color: white; font-size: 1.1rem;
+    }
+    .header-title { font-family: 'Cormorant Garamond', serif; font-size: 1.5rem; font-weight: 400; color: var(--dark); }
+    .header-subtitle { font-size: 0.75rem; color: var(--light); letter-spacing: 0.12em; text-transform: uppercase; }
+    .nav-tabs { display: flex; gap: 0.5rem; }
+    .nav-tab {
+      padding: 0.5rem 1.25rem;
+      border: 1px solid transparent;
+      border-radius: 100px;
+      font-family: 'Jost', sans-serif;
+      font-size: 0.82rem;
+      font-weight: 400;
+      letter-spacing: 0.06em;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: transparent;
+      color: var(--mid);
+    }
+    .nav-tab:hover { border-color: var(--border); background: var(--gold-pale); }
+    .nav-tab.active { background: var(--dark); color: var(--white); border-color: var(--dark); }
+    .nav-tab.admin { color: var(--gold); border-color: var(--border); }
+    .nav-tab.admin.active { background: var(--gold); color: var(--white); border-color: var(--gold); }
+
+    /* Hero */
+    .hero {
+      text-align: center;
+      padding: 5rem 2rem 3rem;
+      background: linear-gradient(180deg, var(--white) 0%, var(--cream) 100%);
+      border-bottom: 1px solid var(--border);
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute; inset: 0;
+      background-image: radial-gradient(circle at 20% 50%, rgba(184,150,62,0.06) 0%, transparent 60%),
+                        radial-gradient(circle at 80% 20%, rgba(196,132,122,0.06) 0%, transparent 60%);
+    }
+    .hero-ornament { color: var(--gold); font-size: 1.5rem; letter-spacing: 0.5em; margin-bottom: 1rem; opacity: 0.7; }
+    .hero-title { font-family: 'Cormorant Garamond', serif; font-size: clamp(2.5rem, 5vw, 4rem); font-weight: 300; color: var(--dark); line-height: 1.1; }
+    .hero-subtitle { font-size: 0.85rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--light); margin: 1rem 0; }
+    .hero-desc { max-width: 540px; margin: 0 auto; color: var(--mid); font-size: 0.95rem; line-height: 1.7; font-weight: 300; }
+    .hero-divider { width: 60px; height: 1px; background: var(--gold); margin: 1.5rem auto; }
+
+    /* Grid */
+    .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1.5rem; }
+
+    /* Gift Card */
+    .gift-card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+    }
+    .gift-card:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
+    .gift-card.reserved { opacity: 0.75; }
+
+    .gift-img {
+      width: 100%; height: 200px;
+      background: var(--gold-pale);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 3rem; color: var(--gold-light);
+      position: relative; overflow: hidden;
+    }
+    .gift-img img { width: 100%; height: 100%; object-fit: cover; }
+    .gift-img-placeholder { font-size: 2.5rem; opacity: 0.5; }
+
+    .reserved-badge {
+      position: absolute; top: 12px; right: 12px;
+      background: var(--dark); color: var(--white);
+      font-size: 0.7rem; font-weight: 500; letter-spacing: 0.1em;
+      text-transform: uppercase; padding: 4px 12px; border-radius: 100px;
+    }
+    .reserved-by {
+      position: absolute; bottom: 12px; left: 12px; right: 12px;
+      background: rgba(44,36,24,0.85);
+      color: var(--white); font-size: 0.75rem;
+      padding: 6px 12px; border-radius: 8px;
+      backdrop-filter: blur(4px);
+    }
+
+    .gift-body { padding: 1.25rem; }
+    .gift-name { font-family: 'Cormorant Garamond', serif; font-size: 1.25rem; font-weight: 500; color: var(--dark); margin-bottom: 0.4rem; }
+    .gift-desc { font-size: 0.82rem; color: var(--mid); line-height: 1.6; margin-bottom: 1rem; min-height: 52px; }
+    .gift-price { font-family: 'Cormorant Garamond', serif; font-size: 1.5rem; font-weight: 600; color: var(--gold); }
+    .gift-footer { padding: 0 1.25rem 1.25rem; display: flex; gap: 0.5rem; }
+
+    /* Buttons */
+    .btn {
+      padding: 0.6rem 1.25rem;
+      border-radius: 100px;
+      font-family: 'Jost', sans-serif;
+      font-size: 0.82rem;
+      font-weight: 500;
+      letter-spacing: 0.06em;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: 1px solid transparent;
+      flex: 1;
+      text-align: center;
+    }
+    .btn-primary { background: var(--dark); color: var(--white); }
+    .btn-primary:hover { background: var(--mid); }
+    .btn-outline { background: transparent; border-color: var(--border); color: var(--mid); }
+    .btn-outline:hover { background: var(--gold-pale); border-color: var(--gold); color: var(--dark); }
+    .btn-gold { background: var(--gold); color: var(--white); }
+    .btn-gold:hover { background: var(--gold-light); }
+    .btn-danger { background: #e05252; color: white; }
+    .btn-danger:hover { background: #c43d3d; }
+    .btn-sm { padding: 0.4rem 0.9rem; font-size: 0.75rem; }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(44,36,24,0.6);
+      z-index: 1000;
+      display: flex; align-items: center; justify-content: center;
+      padding: 1rem;
+      backdrop-filter: blur(4px);
+    }
+    .modal {
+      background: var(--white);
+      border-radius: 20px;
+      padding: 2rem;
+      width: 100%;
+      max-width: 480px;
+      max-height: 90vh;
+      overflow-y: auto;
+      position: relative;
+    }
+    .modal-title { font-family: 'Cormorant Garamond', serif; font-size: 1.6rem; font-weight: 400; margin-bottom: 0.25rem; }
+    .modal-subtitle { font-size: 0.82rem; color: var(--light); margin-bottom: 1.5rem; }
+    .modal-close {
+      position: absolute; top: 1rem; right: 1rem;
+      background: var(--cream); border: none; border-radius: 50%;
+      width: 32px; height: 32px;
+      cursor: pointer; font-size: 1rem; color: var(--mid);
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    /* Form */
+    .form-group { margin-bottom: 1.1rem; }
+    .form-label { font-size: 0.78rem; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--mid); margin-bottom: 0.4rem; display: block; }
+    .form-input {
+      width: 100%;
+      padding: 0.65rem 1rem;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-family: 'Jost', sans-serif;
+      font-size: 0.9rem;
+      color: var(--dark);
+      background: var(--white);
+      transition: border-color 0.2s;
+      outline: none;
+    }
+    .form-input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(184,150,62,0.1); }
+    .form-input::placeholder { color: var(--light); }
+    textarea.form-input { resize: vertical; min-height: 80px; }
+
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+
+    /* QR Code section */
+    .qr-preview {
+      border: 2px dashed var(--border);
+      border-radius: 12px;
+      padding: 2rem;
+      text-align: center;
+      margin: 1rem 0;
+      background: var(--gold-pale);
+    }
+    .qr-img { max-width: 160px; max-height: 160px; border-radius: 8px; }
+    .qr-placeholder { color: var(--light); font-size: 0.85rem; }
+
+    /* Admin Dashboard */
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+    .stat-card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.25rem;
+      text-align: center;
+    }
+    .stat-value { font-family: 'Cormorant Garamond', serif; font-size: 2rem; font-weight: 600; color: var(--gold); }
+    .stat-label { font-size: 0.75rem; color: var(--light); letter-spacing: 0.1em; text-transform: uppercase; margin-top: 0.25rem; }
+
+    .admin-table { width: 100%; border-collapse: collapse; }
+    .admin-table th {
+      text-align: left;
+      font-size: 0.75rem;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--light);
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .admin-table td { padding: 0.9rem 1rem; border-bottom: 1px solid rgba(184,150,62,0.1); font-size: 0.88rem; vertical-align: middle; }
+    .admin-table tr:last-child td { border-bottom: none; }
+    .admin-table tr:hover td { background: var(--gold-pale); }
+
+    .status-pill {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 100px;
+      font-size: 0.72rem;
+      font-weight: 500;
+      letter-spacing: 0.06em;
+    }
+    .status-available { background: #eaf5e9; color: #3a7a35; }
+    .status-reserved { background: #fff3e0; color: #c47a00; }
+    .status-confirmed { background: #fde8e8; color: #c43d3d; }
+
+    /* Section heading */
+    .section-header { text-align: center; padding: 3rem 2rem 1.5rem; }
+    .section-title { font-family: 'Cormorant Garamond', serif; font-size: 2rem; font-weight: 400; }
+    .section-divider { width: 48px; height: 1px; background: var(--gold); margin: 0.75rem auto; }
+    .section-sub { color: var(--mid); font-size: 0.88rem; }
+
+    /* Filter bar */
+    .filter-bar {
+      display: flex; gap: 0.5rem; flex-wrap: wrap;
+      padding: 0 2rem 1.5rem;
+      max-width: 1200px; margin: 0 auto;
+    }
+    .filter-chip {
+      padding: 0.4rem 1rem;
+      border-radius: 100px;
+      border: 1px solid var(--border);
+      font-size: 0.8rem;
+      color: var(--mid);
+      background: var(--white);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .filter-chip.active { background: var(--dark); color: var(--white); border-color: var(--dark); }
+
+    /* Payment step */
+    .payment-options { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin: 1rem 0; }
+    .payment-option {
+      border: 1.5px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.2s;
+      background: var(--white);
+    }
+    .payment-option:hover { border-color: var(--gold); background: var(--gold-pale); }
+    .payment-option.selected { border-color: var(--gold); background: var(--gold-pale); }
+    .payment-option-icon { font-size: 1.5rem; margin-bottom: 0.4rem; }
+    .payment-option-title { font-size: 0.82rem; font-weight: 500; color: var(--dark); }
+    .payment-option-desc { font-size: 0.72rem; color: var(--light); margin-top: 2px; }
+
+    /* Steps */
+    .steps { display: flex; gap: 0; margin-bottom: 1.5rem; }
+    .step-item {
+      flex: 1; text-align: center; padding: 0.5rem;
+      font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase;
+      color: var(--light); border-bottom: 2px solid var(--border); padding-bottom: 0.75rem;
+    }
+    .step-item.active { color: var(--gold); border-color: var(--gold); font-weight: 500; }
+    .step-item.done { color: var(--sage); border-color: var(--sage); }
+
+    /* Toast */
+    .toast {
+      position: fixed; bottom: 2rem; right: 2rem;
+      background: var(--dark); color: var(--white);
+      padding: 0.9rem 1.5rem;
+      border-radius: 12px;
+      font-size: 0.88rem;
+      z-index: 9999;
+      animation: slideIn 0.3s ease;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+    }
+    .toast.success { background: #2e6b2a; }
+    .toast.error { background: #8b2020; }
+
+    @keyframes slideIn {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    /* Empty state */
+    .empty-state { text-align: center; padding: 5rem 2rem; color: var(--light); }
+    .empty-state-icon { font-size: 3rem; margin-bottom: 1rem; opacity: 0.4; }
+    .empty-state-text { font-family: 'Cormorant Garamond', serif; font-size: 1.4rem; color: var(--mid); }
+
+    /* Loader */
+    .loader { text-align: center; padding: 4rem; color: var(--light); }
+
+    /* Config notice */
+    .config-notice {
+      background: #fff8e1; border: 1px solid #f0c040; border-radius: 12px;
+      padding: 1.25rem 1.5rem; margin: 1rem 2rem;
+      font-size: 0.85rem; color: #7a5f00;
+    }
+    .config-notice code {
+      background: rgba(0,0,0,0.08); border-radius: 4px;
+      padding: 2px 6px; font-family: monospace; font-size: 0.8rem;
+    }
+
+    @media (max-width: 640px) {
+      .header { padding: 1rem; }
+      .nav-tabs { display: none; }
+      .form-row { grid-template-columns: 1fr; }
+      .payment-options { grid-template-columns: 1fr; }
+      .stats-grid { grid-template-columns: 1fr 1fr; }
+    }
+  `;
 
   return (
     <>
@@ -554,13 +517,6 @@ export default function WeddingRegistry() {
           )}
         </nav>
       </header>
-
-      {/* Firebase config notice */}
-      {usingMock && (
-        <div className="config-notice">
-          <strong>Modo demonstração</strong> — Para usar com Firebase real, edite <code>FIREBASE_CONFIG_PLACEHOLDER</code> no código com as credenciais do seu projeto Firebase. Os dados abaixo são de exemplo.
-        </div>
-      )}
 
       {/* ── Gallery View ─────────────────────────────────────────────────── */}
       {view === "gallery" && (
@@ -734,7 +690,7 @@ export default function WeddingRegistry() {
                           {gift.status !== "available" && (
                             <button className="btn btn-outline btn-sm" onClick={() => releaseGift(gift.id)}>Liberar</button>
                           )}
-                          <button className="btn btn-danger btn-sm" onClick={() => deleteGift(gift.id)}>✕</button>
+                          <button className="btn btn-danger btn-sm" onClick={() => deleteGiftHandler(gift.id)}>✕</button>
                         </div>
                       </td>
                     </tr>
@@ -770,7 +726,7 @@ export default function WeddingRegistry() {
         <QrConfigModal
           currentQr={qrCode}
           onClose={() => setShowQrConfig(false)}
-          onSave={(url) => { setQrCode(url); setShowQrConfig(false); showToast("QR Code atualizado!", "success"); }}
+          onSave={(url) => handleSaveQr(url)}
         />
       )}
 
@@ -833,6 +789,10 @@ function ReservationModal({ gift, qrCode, onClose, onConfirm }) {
     if (step === 2 && (!firstName.trim() || !lastName.trim())) return;
     if (step === 2 && method === "pix") { setStep(3); return; }
     if (step === 2 && method === "presencial") {
+      onConfirm(gift.id, `${firstName} ${lastName}`, "presencial");
+      return;
+    }
+    if (step === 2 && method === "outro") {
       onConfirm(gift.id, `${firstName} ${lastName}`, "presencial");
       return;
     }
