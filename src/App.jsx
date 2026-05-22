@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
 
 const FIREBASE_CONFIG_PLACEHOLDER = {
-  apiKey: "SUA_API_KEY",
-  authDomain: "SEU_PROJETO.firebaseapp.com",
-  projectId: "SEU_PROJETO_ID",
-  storageBucket: "SEU_PROJETO.appspot.com",
-  messagingSenderId: "SEU_SENDER_ID",
-  appId: "SEU_APP_ID",
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
 // ─── Inline Firebase SDK via CDN ─────────────────────────────────────────────
@@ -531,7 +531,7 @@ export default function WeddingRegistry() {
           <div className="header-logo">♡</div>
           <div>
             <div className="header-title font-display">Lista de Presentes</div>
-            <div className="header-subtitle">Ana & Bruno · 15 de Novembro</div>
+            <div className="header-subtitle">Cecília & Thiago · 30 de Janeiro de 2027</div>
           </div>
         </div>
         <nav className="nav-tabs">
@@ -569,7 +569,7 @@ export default function WeddingRegistry() {
             <div className="hero-ornament">✦ ✦ ✦</div>
             <h1 className="hero-title font-display">Nossa Lista de<br />Presentes</h1>
             <div className="hero-divider" />
-            <p className="hero-subtitle">Casamento · 15 de Novembro de 2025</p>
+            <p className="hero-subtitle">Casamento · 30 de Janeiro de 2027</p>
             <p className="hero-desc">
               Cada presente escolhido com carinho será parte da nossa nova história juntos.
               Escolha um item e nos ajude a construir nosso lar com amor.
