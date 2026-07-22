@@ -36,7 +36,7 @@ export default function GiftCard({ gift, onSelect }) {
             className="btn btn-outline"
             style={{ textDecoration: "none", flex: "0 0 auto" }}
           >
-            Ver
+            Ver no site
           </a>
         )}
         <button
