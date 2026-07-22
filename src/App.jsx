@@ -27,7 +27,7 @@ export default function App() {
 
   // ── Data & operations (Firebase) ──────────────────────────────────────────
   const {
-    gifts, qrCode, stats, filter, setFilter, filteredGifts,
+    gifts, qrCode, stats, filter, setFilter, sortBy, setSortBy, search, setSearch, filteredGifts,
     saveGift, deleteGiftById, confirmReservation, releaseGift, handleSaveQr,
     toast, showToast,
   } = useGifts();
@@ -90,15 +90,39 @@ export default function App() {
 
           {/* Filter bar */}
           <div className="filter-bar">
-            {[["all","Todos"], ["available","Disponíveis"], ["reserved","Reservados"]].map(([val, label]) => (
-              <button
-                key={val}
-                className={`filter-chip ${filter === val ? "active" : ""}`}
-                onClick={() => setFilter(val)}
+            <div className="filter-chips">
+              {[["all","Todos"], ["available","Disponíveis"], ["reserved","Reservados"]].map(([val, label]) => (
+                <button
+                  key={val}
+                  className={`filter-chip ${filter === val ? "active" : ""}`}
+                  onClick={() => setFilter(val)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <div className="filter-controls">
+              <input
+                type="text"
+                className="form-input filter-search"
+                placeholder="Buscar presente..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+
+              <select
+                className="form-input filter-select"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
               >
-                {label}
-              </button>
-            ))}
+                <option value="default">Ordenar por</option>
+                <option value="price-asc">Menor preço</option>
+                <option value="price-desc">Maior preço</option>
+                <option value="name-asc">Nome (A-Z)</option>
+                <option value="name-desc">Nome (Z-A)</option>
+              </select>
+            </div>
           </div>
 
           {/* Gift grid */}

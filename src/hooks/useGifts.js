@@ -15,6 +15,8 @@ export function useGifts() {
   const [gifts, setGifts] = useState([]);
   const [qrCode, setQrCode] = useState("");
   const [filter, setFilter] = useState("all");
+  const [sortBy, setSortBy] = useState("default"); // "default" | "price-asc" | "price-desc" | "name-asc" | "name-desc"
+  const [search, setSearch] = useState("");
   const [toast, setToast] = useState(null);
 
   // ── Realtime subscription ──────────────────────────────────────────────────
@@ -106,11 +108,27 @@ export function useGifts() {
       .reduce((s, g) => s + (Number(g.price) || 0), 0),
   };
 
-  const filteredGifts = gifts.filter((g) => {
-    if (filter === "available") return g.status === "available";
-    if (filter === "reserved") return g.status !== "available";
-    return true; // "all"
-  });
+  const filteredGifts = gifts
+    .filter((g) => {
+      if (filter === "available") return g.status === "available";
+      if (filter === "reserved") return g.status !== "available";
+      return true; // "all"
+    })
+    .filter((g) => {
+      if (!search.trim()) return true;
+      const q = search.trim().toLowerCase();
+      return (
+        g.name?.toLowerCase().includes(q) ||
+        g.description?.toLowerCase().includes(q)
+      );
+    })
+    .sort((a, b) => {
+      if (sortBy === "price-asc") return (Number(a.price) || 0) - (Number(b.price) || 0);
+      if (sortBy === "price-desc") return (Number(b.price) || 0) - (Number(a.price) || 0);
+      if (sortBy === "name-asc") return (a.name || "").localeCompare(b.name || "", "pt-BR");
+      if (sortBy === "name-desc") return (b.name || "").localeCompare(a.name || "", "pt-BR");
+      return 0; // "default" — mantém ordem original (Firestore)
+    });
 
   return {
     gifts,
@@ -118,6 +136,10 @@ export function useGifts() {
     stats,
     filter,
     setFilter,
+    sortBy,
+    setSortBy,
+    search,
+    setSearch,
     filteredGifts,
     saveGift,
     deleteGiftById,
